@@ -1,0 +1,59 @@
+<div class="parent">
+    <!-- Columna 1: Tabla de productos -->
+    <div class="tabla-compra">
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre producto</th>
+            <th>Valor individual</th>
+            <th>Cantidad</th>
+            <th>Subtotal</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (productosAgrupados.length === 0) {
+            <tr>
+              <td colspan="5" style="text-align: center;">No hay productos en el carrito</td>
+            </tr>
+          } @else {
+            @for (producto of productosAgrupados; track producto.cod_producto) {
+              <tr>
+                <td>{{producto.nombre_p}}</td>
+                <td>${{producto.precio_p | number:'1.0-0'}}</td>
+                <td>{{producto.cantidad}}</td>
+                <td>${{producto.subtotal | number:'1.0-0'}}</td>
+                <td>
+                  <button (click)="eliminarProducto(producto)" class="text-red-500 hover:text-red-700">
+                    X
+                  </button>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Columna 2: Línea vertical -->
+    <div class="linea"></div>
+
+    <!-- Columna 3: Totales y botones -->
+    <div class="panel-lateral">
+      <div class="dato">
+        <span>Total de productos</span> <span>|</span> <span>{{totalProductos}}</span>
+      </div>
+      <div class="dato">
+        <span>Total a pagar</span> <span>|</span> <span>${{totalPagar | number:'1.0-0'}}</span>
+      </div>
+      <div class="dato">
+        <span>Total en USD</span> <span>|</span> <span>${{totalDolares.toFixed(2)}}</span>
+      </div>
+      <div class="botones">
+        <button class="cancelar" (click)="cancelarCompra()">Cancelar Compra</button>
+        <button class="pagar" (click)="procesarPago()" [disabled]="procesandoPago || totalProductos === 0">
+          {{procesandoPago ? 'Procesando...' : 'Pagar'}}
+        </button>
+      </div>
+    </div>
+</div>

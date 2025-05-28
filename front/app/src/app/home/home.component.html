@@ -1,0 +1,13 @@
+<main class="container">
+    <div class="product-grid">
+      <!-- Producto -->
+       @for (producto of productos; track producto.cod_producto) {
+      <div class="product-card">
+        <div class="product-image"></div>
+        <h3>{{producto.nombre_p}}</h3>
+        <p>{{producto.precio_p}}</p>
+        <button (click)="agregar_productos_carrito(producto)">Añadir al carrito</button>
+      </div>
+      }
+    </div>
+  </main>

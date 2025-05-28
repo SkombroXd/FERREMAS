@@ -1,0 +1,83 @@
+body {
+  margin: 0;
+  padding: 20px;
+  background-color: #ececf2;
+  font-family: Arial, sans-serif;
+}
+
+.parent {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  grid-template-rows: 1fr;
+  grid-column-gap: 20px;
+  grid-row-gap: 0px;
+}
+
+/* Columna izquierda (selector + gestión stock) */
+.left-panel {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+/* Sección de alertas */
+.alerts-panel {
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  border: 1px solid #ccc;
+}
+
+/* Dropdown selector */
+.product-selector {
+  width: 100%;
+  padding: 8px;
+  font-size: 16px;
+  margin-bottom: 20px;
+}
+
+/* Detalles del producto */
+.product-details {
+  margin-bottom: 20px;
+}
+
+.product-price {
+  font-weight: bold;
+  font-size: 18px;
+  margin-bottom: 10px;
+}
+
+.product-stock {
+  font-size: 16px;
+}
+
+.low-stock {
+  color: red;
+  font-weight: bold;
+}
+
+/* Formulario agregar stock */
+.stock-form {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.stock-form input[type="number"] {
+  width: 80px;
+  padding: 6px;
+}
+
+.stock-form button {
+  padding: 6px 12px;
+  background-color: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.stock-form button:hover {
+  background-color: #0056b3;
+}

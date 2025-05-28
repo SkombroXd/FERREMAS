@@ -1,0 +1,28 @@
+<main class="w-full h-full text-black flex flex-col items-center">
+    <section class="flex flex-col items-center justify-center">
+        <div class="flex items-center gap-2">
+            <h1 class="font-grotesk text-4xl font-medium">Rincón de Moonie</h1>
+        </div>
+        <p class="text-neutral-800 mt-2 mb-4">
+            {{ loading ? 'Procesando pago...' : '' }}
+            {{ error ? 'Ha ocurrido un error con la transacción, por favor intente nuevamente.' : '' }}
+            {{ transactionData?.status === 'success' ? '¡Gracias por tu compra!' : '' }}
+        </p>
+        <button class="font-grotesk cursor-pointer text-neutral-800 font-medium flex items-center gap-2" (click)="volverAInicio()">
+            Volver a la tienda
+        </button>
+    </section>
+    <section class="flex flex-col max-w-md w-full bg-neutral-100 p-4 rounded-md shadow-md shadow-neutral-200 mt-8">
+        @if (transactionData) {
+            <h2 class="text-neutral-800 font-medium font-grotesk text-lg">Información de la transacción</h2>
+            <div class="flex flex-col space-y-1 mt-2">
+                <p class="text-neutral-800 text-sm">Estado: <span class="text-green-500">Aprobado</span></p>
+                <p class="text-neutral-800 text-sm">Monto: <span class="text-green-500">${{ transactionData.amount?.toLocaleString('es-CL') }}</span></p>
+                <p class="text-neutral-800 text-sm">Tarjeta: <span class="text-green-500">**** **** **** {{ transactionData.card_number?.slice(-4) }}</span></p>
+                <p class="text-neutral-800 text-sm">Orden: <span class="text-green-500">{{ transactionData.buy_order }}</span></p>
+            </div>
+        } @else {
+            <h2>Cargando información de la transacción...</h2>
+        }
+    </section>
+</main>

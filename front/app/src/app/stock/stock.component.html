@@ -1,0 +1,112 @@
+<main class="w-full h-full text-black flex flex-col items-center">
+    <section class="flex flex-col items-center justify-center">
+        <div class="flex items-center gap-2">
+
+        </div>
+        <p class="text-neutral-800 mt-2 mb-4">Gestión de Stock</p>
+    </section>
+
+    <!-- Botón de Alertas Flotante -->
+    <div class="fixed top-4 right-4 z-50">
+        <div class="relative">
+            <button 
+                (click)="toggleAlertas()"
+                class="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-lg"
+            >
+                <span class="font-medium">Alertas de Stock</span>
+                @if (notificaciones.length > 0) {
+                    <span class="bg-white text-red-500 text-sm px-2 py-0.5 rounded-full font-bold">
+                        {{ notificaciones.length }}
+                    </span>
+                }
+                <span class="ml-2">
+                    {{ mostrarAlertas ? '▼' : '▶' }}
+                </span>
+            </button>
+
+            <!-- Panel de Alertas Flotante -->
+            @if (mostrarAlertas) {
+                <div class="absolute right-0 mt-2 w-96 bg-white border border-red-200 rounded-lg p-4 shadow-2xl z-50">
+                    <div class="flex justify-between items-center mb-3 pb-2 border-b border-red-100">
+                        <h3 class="font-medium text-red-600">Alertas Activas</h3>
+                        <button 
+                            (click)="toggleAlertas()"
+                            class="text-neutral-400 hover:text-neutral-600"
+                        >
+                            ✕
+                        </button>
+                    </div>
+                    @if (notificaciones.length > 0) {
+                        <div class="max-h-96 overflow-y-auto">
+                            @for (notif of notificaciones; track notif.producto) {
+                                <div class="text-red-700 mb-2 last:mb-0 p-3 hover:bg-red-50 rounded transition-colors">
+                                    <p class="flex items-start gap-2">
+                                        <span class="text-xl mt-1">⚠️</span>
+                                        <span>
+                                            El producto <strong>"{{ notif.producto }}"</strong> tiene solo 
+                                            <span class="font-bold">{{ notif.stock }}</span> unidades en stock
+                                        </span>
+                                    </p>
+                                </div>
+                            }
+                        </div>
+                    } @else {
+                        <p class="text-neutral-500 text-center py-4">No hay alertas activas</p>
+                    }
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Selector de Producto -->
+    <section class="w-full max-w-4xl">
+        <div class="mb-4">
+            <select 
+                [(ngModel)]="productoSeleccionado" 
+                (change)="seleccionarProducto()"
+                class="w-full p-2 border rounded-lg bg-white"
+            >
+                <option value="">Seleccione un producto</option>
+                @for (producto of productos; track producto.cod_producto) {
+                    <option [value]="producto.cod_producto">{{ producto.nombre_p }}</option>
+                }
+            </select>
+        </div>
+
+        <!-- Detalles del Producto Seleccionado -->
+        @if (productoSeleccionado) {
+            <div class="border border-neutral-200 rounded-lg p-4 bg-white">
+                <div class="grid grid-cols-3 gap-4 items-center">
+                    <div>
+                        <p class="text-sm text-neutral-600">Precio</p>
+                        <p class="font-medium">${{ productoActual?.precio_p?.toLocaleString('es-CL') }}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-neutral-600">Stock</p>
+                        <p class="font-medium" [class.text-red-500]="productoActual?.unidades_p < 10">
+                            {{ productoActual?.unidades_p }}
+                        </p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-neutral-600">Agregar Stock</p>
+                        <div class="flex items-center gap-2">
+                            <input 
+                                type="number" 
+                                min="0" 
+                                [(ngModel)]="cantidadAgregar" 
+                                class="w-20 p-1 border rounded"
+                                placeholder="Cantidad"
+                            >
+                            <button 
+                                (click)="agregarStock()" 
+                                class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                            >
+                                Agregar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </section>
+</main>  

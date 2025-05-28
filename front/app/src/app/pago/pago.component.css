@@ -1,0 +1,106 @@
+.parent {
+  height: 90dvh;
+  display: grid;
+  grid-template-columns: 2fr 0.5fr 1fr;
+  grid-template-rows: 1fr;
+  grid-column-gap: 20px;
+  padding: 6px 4px;
+  box-sizing: border-box;
+}
+
+.tabla-compra {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-left: 10%;
+}
+
+.tabla-compra table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.tabla-compra th {
+  background-color: #0070f3;
+  color: white;
+  font-weight: 600;
+  padding: 14px;
+  text-align: center;
+}
+
+.tabla-compra td {
+  padding: 12px;
+  text-align: center;
+  border-top: 1px solid #e0e0e0;
+  background-color: #fafafa;
+}
+
+.tabla-compra tr:nth-child(even) td {
+  background-color: #f0f4f8;
+}
+
+.linea {
+  width: 2px;
+  height: 80%;
+  background-color: #ccc;
+  justify-self: center;
+  align-self: center;
+}
+
+.panel-lateral {
+  background-color: white;
+  border-radius: 8px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  height: fit-content;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  margin-top: 50%;
+  margin-right: 20%;
+}
+
+.dato {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+  background-color: #e8f0fe;
+  border-radius: 6px;
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.botones {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+button {
+  flex: 1;
+  padding: 12px;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+button.cancelar {
+  background-color: #ff5f5f;
+  color: white;
+}
+
+button.cancelar:hover {
+  background-color: #e64545;
+}
+
+button.pagar {
+  background-color: #00c853;
+  color: white;
+}
+
+button.pagar:hover {
+  background-color: #00b248;
+}

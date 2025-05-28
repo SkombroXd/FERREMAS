@@ -1,0 +1,38 @@
+/* You can add global styles to this file, and also import other style files */
+
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #ececf3;
+  }
+
+
+
+  
+  .navbar {
+    background-color: #2f333a;
+    color: white;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  .logo {
+    width: 30px;
+    height: 30px;
+    background-color: #ea6d6d;
+    border-radius: 50%;
+  }
+  
+  nav a {
+    color: white;
+    margin: 0 10px;
+    text-decoration: none;
+    padding: 5px 10px;
+    border-radius: 4px;
+  }
+  
+  nav a.active {
+    background-color: #42557d;
+  }
