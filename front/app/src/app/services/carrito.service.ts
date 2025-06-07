@@ -15,6 +15,9 @@ export class CarritoService {
       this.carrito = JSON.parse(carritoGuardado);
       this.carritoSubject.next(this.carrito);
     }
+
+    // Escuchar cambios en localStorage para sincronización entre pestañas/ventanas
+    window.addEventListener('storage', this.syncCarritoFromLocalStorage.bind(this));
   }
 
   getCarrito(): Observable<any[]> {
@@ -41,6 +44,7 @@ export class CarritoService {
     // Guardar en localStorage
     localStorage.setItem('carrito', JSON.stringify(this.carrito));
     // Notificar a los suscriptores
+    console.log('CarritoService: Notificando a suscriptores con:', [...this.carrito]);
     this.carritoSubject.next([...this.carrito]);
   }
 
@@ -51,5 +55,29 @@ export class CarritoService {
 
   obtenerCarrito(): any[] {
     return this.carrito;
+  }
+
+  private syncCarritoFromLocalStorage(event: StorageEvent) {
+    if (event.key === 'carrito' && event.newValue !== null) {
+      console.log(`CarritoService: localStorage 'carrito' ha cambiado en otra pestaña.`);
+      try {
+        const nuevoCarrito = JSON.parse(event.newValue);
+        // Solo actualizar si el carrito realmente ha cambiado para evitar bucles
+        if (JSON.stringify(this.carrito) !== JSON.stringify(nuevoCarrito)) {
+          this.carrito = nuevoCarrito;
+          this.carritoSubject.next([...this.carrito]);
+          console.log('CarritoService: Carrito sincronizado desde localStorage.');
+        }
+      } catch (e) {
+        console.error('Error al parsear el carrito desde localStorage:', e);
+      }
+    } else if (event.key === 'carrito' && event.newValue === null) {
+      // Carrito limpiado en otra pestaña
+      if (this.carrito.length > 0) {
+        this.carrito = [];
+        this.carritoSubject.next([]);
+        console.log('CarritoService: Carrito limpiado desde localStorage.');
+      }
+    }
   }
 }

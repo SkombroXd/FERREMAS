@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { CarritoService } from '../services/carrito.service';
@@ -34,7 +34,8 @@ export class PagoComponent implements OnInit, OnDestroy {
     private carritoService: CarritoService,
     private pagoService: PagoService,
     private router: Router,
-    private http: HttpClient
+    private http: HttpClient,
+    private cdr: ChangeDetectorRef
   ) {
     this.subscription = new Subscription();
   }
@@ -42,9 +43,11 @@ export class PagoComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.cargarValorDolar();
     this.subscription = this.carritoService.getCarrito().subscribe(productos => {
-      console.log('Productos en el carrito:', productos);
-      this.productosAgrupados = this.agruparProductos(productos);
+      console.log('PagoComponent: Recibiendo productos del carrito:', productos);
+      const productosAgrupadosTemp = this.agruparProductos(productos);
+      this.productosAgrupados = [...productosAgrupadosTemp];
       this.calcularTotales();
+      this.cdr.detectChanges();
     });
   }
 
@@ -60,8 +63,11 @@ export class PagoComponent implements OnInit, OnDestroy {
     productos.forEach(producto => {
       if (productosMap.has(producto.cod_producto)) {
         const productoExistente = productosMap.get(producto.cod_producto)!;
-        productoExistente.cantidad += 1;
-        productoExistente.subtotal = productoExistente.cantidad * productoExistente.precio_p;
+        productosMap.set(producto.cod_producto, {
+          ...productoExistente,
+          cantidad: productoExistente.cantidad + 1,
+          subtotal: (productoExistente.cantidad + 1) * productoExistente.precio_p
+        });
       } else {
         productosMap.set(producto.cod_producto, {
           cod_producto: producto.cod_producto,
@@ -108,13 +114,29 @@ export class PagoComponent implements OnInit, OnDestroy {
 
   async procesarPago() {
     if (this.procesandoPago) return;
-    
+
     try {
       this.procesandoPago = true;
       console.log('Iniciando proceso de pago...');
-      console.log('Productos:', this.productosAgrupados);
-      console.log('Total:', this.totalPagar);
+      console.log('Productos en el carrito:', this.productosAgrupados);
+      console.log('Total a pagar:', this.totalPagar);
 
+      // 1. Obtener stock actual de todos los productos
+      const productosEnBaseDeDatos: any[] = await this.http.get<any[]>('http://localhost:5000/api/lista-productos').toPromise() ?? [];
+
+      // 2. Verificar stock para cada producto en el carrito
+      for (const productoCarrito of this.productosAgrupados) {
+        const productoDb = productosEnBaseDeDatos.find(p => p.cod_producto === productoCarrito.cod_producto);
+
+        if (!productoDb || productoDb.unidades_p < productoCarrito.cantidad) {
+          const mensaje = `Stock insuficiente para "${productoCarrito.nombre_p}". Disponible: ${productoDb ? productoDb.unidades_p : 0} unidades.`;
+          alert(mensaje);
+          this.procesandoPago = false;
+          return; // Detener el proceso de pago
+        }
+      }
+
+      // Si todo el stock es suficiente, proceder con el pago
       const response = await this.pagoService.procesarPago(
         this.productosAgrupados,
         this.totalPagar

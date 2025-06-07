@@ -134,7 +134,7 @@ def procesar_pago():
         print("Creando boleta:", boleta_data)
         supabase.table('boleta').insert(boleta_data).execute()
         
-        # Crear detalles de boleta y actualizar stock
+        # Crear detalles de boleta
         for producto in productos:
             detalle_data = {
                 'cod_producto': producto['cod_producto'],
@@ -144,25 +144,6 @@ def procesar_pago():
             }
             print("Creando detalle:", detalle_data)
             supabase.table('detalle_boleta').insert(detalle_data).execute()
-            
-            # Actualizar stock
-            stock_actual = supabase.table('productos').select('unidades_p').eq('cod_producto', producto['cod_producto']).execute().data[0]['unidades_p']
-            nuevo_stock = stock_actual - producto['cantidad']
-            print(f"Actualizando stock de {producto['cod_producto']}: {stock_actual} -> {nuevo_stock}")
-            
-            # Actualizar stock en la base de datos
-            supabase.table('productos').update({
-                'unidades_p': nuevo_stock
-            }).eq('cod_producto', producto['cod_producto']).execute()
-            
-            # Verificar si el stock quedó bajo
-            if nuevo_stock < 10:
-                mensaje = {
-                    'tipo': 'stock_bajo',
-                    'producto': producto['nombre_p'],
-                    'stock': nuevo_stock
-                }
-                notificaciones_queue.put(mensaje)
         
         # Crear transacción en Transbank
         buy_order = orden_compra
@@ -207,6 +188,31 @@ def commit_transaction_post():
                 'num_tarjeta': result['card_detail']['card_number']
             }).eq('orden_compra', orden_compra).execute()
             
+            # Obtener detalles de la boleta para actualizar el stock
+            detalles = supabase.table('detalle_boleta').select('*').eq('orden_compra', orden_compra).execute()
+            
+            # Actualizar stock para cada producto
+            for detalle in detalles.data:
+                # Obtener stock actual
+                producto = supabase.table('productos').select('*').eq('cod_producto', detalle['cod_producto']).execute()
+                if producto.data:
+                    stock_actual = producto.data[0]['unidades_p']
+                    nuevo_stock = stock_actual - detalle['unidades_c']
+                    
+                    # Actualizar stock
+                    supabase.table('productos').update({
+                        'unidades_p': nuevo_stock
+                    }).eq('cod_producto', detalle['cod_producto']).execute()
+                    
+                    # Verificar si el stock quedó bajo
+                    if nuevo_stock < 10:
+                        mensaje = {
+                            'tipo': 'stock_bajo',
+                            'producto': producto.data[0]['nombre_p'],
+                            'stock': nuevo_stock
+                        }
+                        notificaciones_queue.put(mensaje)
+            
             return jsonify({
                 'status': 'success',
                 'buy_order': result['buy_order'],
@@ -214,7 +220,7 @@ def commit_transaction_post():
                 'card_number': result['card_detail']['card_number']
             })
         else:
-            # Si el pago falla, revertir los cambios
+            # Si el pago falla, eliminar la boleta y sus detalles
             supabase.table('detalle_boleta').delete().eq('orden_compra', orden_compra).execute()
             supabase.table('boleta').delete().eq('orden_compra', orden_compra).execute()
             
@@ -224,7 +230,7 @@ def commit_transaction_post():
             }), 400
             
     except Exception as e:
-        print(f"Error en commit_transaction: {str(e)}")  # Agregar log para depuración
+        print(f"Error en commit_transaction: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/actualizar-stock', methods=['POST'])

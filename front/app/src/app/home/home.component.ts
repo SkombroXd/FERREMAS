@@ -12,6 +12,8 @@ import { CarritoService } from '../services/carrito.service';
 })
 export class HomeComponent {
   productos: any[] = [];
+  mostrarAlerta: boolean = false;
+  alertaMensaje: string = '';
 
   constructor(private productosService: ProductosService, private carritoService: CarritoService) {
     this.productosService.getProductos().subscribe((data: any) => {
@@ -20,7 +22,24 @@ export class HomeComponent {
   }
 
   agregar_productos_carrito(producto: any) {
+    if (producto.unidades_p <= 0) {
+      console.log('HomeComponent: No hay stock para', producto.nombre_p);
+      this.alertaMensaje = 'No hay stock disponible';
+      this.mostrarAlerta = true;
+      setTimeout(() => {
+        this.mostrarAlerta = false;
+        this.alertaMensaje = '';
+      }, 3000);
+      return;
+    }
+
+    console.log('HomeComponent: Agregando producto al carrito', producto);
     this.carritoService.agregarProducto(producto);
-    console.log('Producto agregado:', producto);
+    this.alertaMensaje = 'Producto guardado en el carrito';
+    this.mostrarAlerta = true;
+    setTimeout(() => {
+      this.mostrarAlerta = false;
+      this.alertaMensaje = '';
+    }, 3000);
   }
 }

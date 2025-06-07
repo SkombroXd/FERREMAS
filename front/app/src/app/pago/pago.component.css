@@ -14,6 +14,7 @@
   border-radius: 8px;
   overflow: hidden;
   margin-left: 10%;
+  margin-top: 3%;
 }
 
 .tabla-compra table {
@@ -64,11 +65,28 @@
 .dato {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   padding: 12px;
   background-color: #e8f0fe;
   border-radius: 6px;
   font-weight: 600;
   color: #1a202c;
+}
+
+.dato > span:first-child {
+  flex: 1;
+  text-align: left;
+}
+
+.dato > span:nth-child(2) {
+  flex-shrink: 0;
+  width: 10px; /* Ancho fijo para el separador */
+  text-align: center;
+}
+
+.dato > span:last-child {
+  flex: 1;
+  text-align: right;
 }
 
 .botones {

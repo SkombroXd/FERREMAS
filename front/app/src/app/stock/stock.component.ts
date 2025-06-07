@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -17,15 +17,15 @@ export class StockComponent implements OnInit, OnDestroy {
   productoSeleccionado: string = '';
   productoActual: any = null;
   cantidadAgregar: number = 0;
-  mostrarAlertas: boolean = false;
+  mostrarHistorial: boolean = false;
   private eventSource: EventSource | null = null;
   private subscription: Subscription | null = null;
 
-  constructor(private http: HttpClient) {}
+  constructor(private http: HttpClient, private cdr: ChangeDetectorRef, private ngZone: NgZone) {}
 
   ngOnInit() {
     this.cargarProductos();
-    this.iniciarNotificaciones();
+    this.iniciarEventSource();
   }
 
   ngOnDestroy() {
@@ -37,22 +37,74 @@ export class StockComponent implements OnInit, OnDestroy {
     }
   }
 
-  toggleAlertas() {
-    this.mostrarAlertas = !this.mostrarAlertas;
+  toggleHistorial() {
+    this.mostrarHistorial = !this.mostrarHistorial;
   }
 
   cargarProductos() {
     this.http.get<any[]>('http://localhost:5000/api/lista-productos').subscribe(
       (data) => {
-        // Ordenar productos alfabéticamente por nombre
-        this.productos = data.sort((a, b) => a.nombre_p.localeCompare(b.nombre_p));
-        // Verificar productos con stock bajo al cargar
-        this.verificarStockBajo();
+        this.productos = data.sort((a, b) => a.unidades_p - b.unidades_p);
+        if (this.productoActual) {
+          const productoActualizado = this.productos.find(p => p.cod_producto === this.productoActual.cod_producto);
+          if (productoActualizado) {
+            this.productoActual = productoActualizado;
+          }
+        }
+        this.actualizarNotificaciones();
       },
       (error) => {
         console.error('Error al cargar productos:', error);
       }
     );
+  }
+
+  iniciarEventSource() {
+    if (this.eventSource) {
+      this.eventSource.close(); 
+    }
+    this.eventSource = new EventSource('http://localhost:5000/api/notificaciones');
+    
+    this.eventSource.onmessage = (event) => {
+      this.ngZone.run(() => {
+        console.log('StockComponent: Mensaje SSE recibido:', event.data);
+        const notificacion = JSON.parse(event.data);
+        
+        const existe = this.notificaciones.some(n => 
+          n.producto === notificacion.producto && n.stock === notificacion.stock
+        );
+        
+        if (!existe) {
+          this.notificaciones.unshift(notificacion);
+          this.cdr.detectChanges();
+        }
+
+        this.cargarProductos();
+      });
+    };
+
+    this.eventSource.onerror = (error) => {
+      this.ngZone.run(() => {
+        console.error('StockComponent: Error en la conexión SSE:', error);
+        if (this.eventSource && this.eventSource.readyState === EventSource.CLOSED) {
+          console.log('StockComponent: Reconectando a SSE...');
+          setTimeout(() => this.iniciarEventSource(), 5000);
+        }
+      });
+    };
+  }
+
+  actualizarNotificaciones() {
+    const productosStockBajo = this.productos.filter(p => p.unidades_p < 10);
+    
+    const nuevasNotificaciones = productosStockBajo.map(producto => ({
+      tipo: 'stock_bajo',
+      producto: producto.nombre_p,
+      stock: producto.unidades_p
+    }));
+
+    this.notificaciones = nuevasNotificaciones;
+    this.cdr.detectChanges();
   }
 
   verificarStockBajo() {
@@ -69,15 +121,13 @@ export class StockComponent implements OnInit, OnDestroy {
   }
 
   agregarNotificacion(notificacion: any) {
-    // Evitar duplicados
     const existe = this.notificaciones.some(n => 
       n.producto === notificacion.producto && n.stock === notificacion.stock
     );
     
     if (!existe) {
       this.notificaciones.unshift(notificacion);
-      // Mostrar automáticamente las alertas cuando hay nuevas
-      this.mostrarAlertas = true;
+      this.cdr.detectChanges();
     }
   }
 
@@ -90,24 +140,9 @@ export class StockComponent implements OnInit, OnDestroy {
     }
   }
 
-  iniciarNotificaciones() {
-    this.eventSource = new EventSource('http://localhost:5000/api/notificaciones');
-    
-    this.eventSource.onmessage = (event) => {
-      const notificacion = JSON.parse(event.data);
-      if (notificacion.tipo === 'stock_bajo') {
-        this.agregarNotificacion(notificacion);
-      }
-    };
-
-    this.eventSource.onerror = (error) => {
-      console.error('Error en SSE:', error);
-      if (this.eventSource) {
-        this.eventSource.close();
-        // Intentar reconectar después de 5 segundos
-        setTimeout(() => this.iniciarNotificaciones(), 5000);
-      }
-    };
+  seleccionarProductoTabla(producto: any) {
+    this.productoActual = producto;
+    this.cantidadAgregar = 0;
   }
 
   agregarStock() {
@@ -118,11 +153,11 @@ export class StockComponent implements OnInit, OnDestroy {
       cantidad: this.cantidadAgregar
     }).subscribe(
       (response: any) => {
-        // Actualizar localmente
         this.productoActual.unidades_p = response.stock_actual;
         this.cantidadAgregar = 0;
 
-        // Verificar si el stock sigue bajo
+        this.productos = this.productos.sort((a, b) => a.unidades_p - b.unidades_p);
+
         if (this.productoActual.unidades_p < 10) {
           const notificacion = {
             tipo: 'stock_bajo',
@@ -131,7 +166,6 @@ export class StockComponent implements OnInit, OnDestroy {
           };
           this.agregarNotificacion(notificacion);
         } else {
-          // Remover notificación si el stock ya no está bajo
           this.notificaciones = this.notificaciones.filter(n => n.producto !== this.productoActual.nombre_p);
         }
       },
@@ -139,5 +173,13 @@ export class StockComponent implements OnInit, OnDestroy {
         console.error('Error al actualizar stock:', error);
       }
     );
+  }
+
+  esStockBajo(producto: any): boolean {
+    return producto.unidades_p < 10;
+  }
+
+  estaEnAlertas(producto: any): boolean {
+    return this.notificaciones.some(n => n.producto === producto.nombre_p);
   }
 }
