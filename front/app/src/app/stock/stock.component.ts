@@ -70,16 +70,38 @@ export class StockComponent implements OnInit, OnDestroy {
         console.log('StockComponent: Mensaje SSE recibido:', event.data);
         const notificacion = JSON.parse(event.data);
         
-        const existe = this.notificaciones.some(n => 
-          n.producto === notificacion.producto && n.stock === notificacion.stock
-        );
-        
-        if (!existe) {
-          this.notificaciones.unshift(notificacion);
+        // Actualizar el producto en la lista si existe
+        const productoIndex = this.productos.findIndex(p => p.cod_producto === notificacion.cod_producto);
+        if (productoIndex !== -1) {
+          // Actualizar el stock del producto
+          this.productos[productoIndex].unidades_p = notificacion.stock;
+          
+          // Si es el producto actual, actualizarlo también
+          if (this.productoActual && this.productoActual.cod_producto === notificacion.cod_producto) {
+            this.productoActual.unidades_p = notificacion.stock;
+          }
+
+          // Actualizar notificaciones
+          if (notificacion.tipo === 'stock_bajo') {
+            const existe = this.notificaciones.some(n => n.producto === notificacion.producto);
+            if (!existe) {
+              this.notificaciones.unshift(notificacion);
+            } else {
+              // Actualizar la notificación existente
+              const index = this.notificaciones.findIndex(n => n.producto === notificacion.producto);
+              if (index !== -1) {
+                this.notificaciones[index] = notificacion;
+              }
+            }
+          } else if (notificacion.tipo === 'stock_actualizado') {
+            // Si el stock se actualizó y ya no está bajo, eliminar la notificación
+            this.notificaciones = this.notificaciones.filter(n => n.producto !== notificacion.producto);
+          }
+
+          // Ordenar productos por stock
+          this.productos = this.productos.sort((a, b) => a.unidades_p - b.unidades_p);
           this.cdr.detectChanges();
         }
-
-        this.cargarProductos();
       });
     };
 
@@ -95,15 +117,17 @@ export class StockComponent implements OnInit, OnDestroy {
   }
 
   actualizarNotificaciones() {
+    // Filtrar solo productos con stock bajo
     const productosStockBajo = this.productos.filter(p => p.unidades_p < 10);
     
-    const nuevasNotificaciones = productosStockBajo.map(producto => ({
+    // Crear nuevas notificaciones solo para productos con stock bajo
+    this.notificaciones = productosStockBajo.map(producto => ({
       tipo: 'stock_bajo',
       producto: producto.nombre_p,
-      stock: producto.unidades_p
+      stock: producto.unidades_p,
+      cod_producto: producto.cod_producto
     }));
 
-    this.notificaciones = nuevasNotificaciones;
     this.cdr.detectChanges();
   }
 
@@ -153,16 +177,26 @@ export class StockComponent implements OnInit, OnDestroy {
       cantidad: this.cantidadAgregar
     }).subscribe(
       (response: any) => {
+        // Actualizar el producto actual
         this.productoActual.unidades_p = response.stock_actual;
+        
+        // Actualizar el producto en la lista
+        const productoIndex = this.productos.findIndex(p => p.cod_producto === this.productoActual.cod_producto);
+        if (productoIndex !== -1) {
+          this.productos[productoIndex].unidades_p = response.stock_actual;
+        }
+        
         this.cantidadAgregar = 0;
-
         this.productos = this.productos.sort((a, b) => a.unidades_p - b.unidades_p);
+        this.cdr.detectChanges();
 
+        // Actualizar notificaciones
         if (this.productoActual.unidades_p < 10) {
           const notificacion = {
             tipo: 'stock_bajo',
             producto: this.productoActual.nombre_p,
-            stock: this.productoActual.unidades_p
+            stock: this.productoActual.unidades_p,
+            cod_producto: this.productoActual.cod_producto
           };
           this.agregarNotificacion(notificacion);
         } else {
@@ -180,6 +214,6 @@ export class StockComponent implements OnInit, OnDestroy {
   }
 
   estaEnAlertas(producto: any): boolean {
-    return this.notificaciones.some(n => n.producto === producto.nombre_p);
+    return this.notificaciones.some(n => n.producto === producto.nombre_p && n.tipo === 'stock_bajo');
   }
 }

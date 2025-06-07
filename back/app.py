@@ -193,25 +193,32 @@ def commit_transaction_post():
             
             # Actualizar stock para cada producto
             for detalle in detalles.data:
-                # Obtener stock actual
-                producto = supabase.table('productos').select('*').eq('cod_producto', detalle['cod_producto']).execute()
-                if producto.data:
-                    stock_actual = producto.data[0]['unidades_p']
-                    nuevo_stock = stock_actual - detalle['unidades_c']
-                    
-                    # Actualizar stock
-                    supabase.table('productos').update({
-                        'unidades_p': nuevo_stock
-                    }).eq('cod_producto', detalle['cod_producto']).execute()
-                    
-                    # Verificar si el stock quedó bajo
-                    if nuevo_stock < 10:
+                try:
+                    # Obtener producto completo
+                    producto = supabase.table('productos').select('*').eq('cod_producto', detalle['cod_producto']).execute()
+                    if producto.data:
+                        stock_actual = producto.data[0]['unidades_p']
+                        nuevo_stock = stock_actual - detalle['unidades_c']
+                        
+                        # Actualizar stock
+                        supabase.table('productos').update({
+                            'unidades_p': nuevo_stock
+                        }).eq('cod_producto', detalle['cod_producto']).execute()
+                        
+                        # Enviar notificación de actualización de stock
                         mensaje = {
-                            'tipo': 'stock_bajo',
+                            'tipo': 'stock_bajo' if nuevo_stock < 10 else 'stock_actualizado',
                             'producto': producto.data[0]['nombre_p'],
-                            'stock': nuevo_stock
+                            'stock': nuevo_stock,
+                            'cod_producto': detalle['cod_producto']
                         }
                         notificaciones_queue.put(mensaje)
+                        
+                        # Esperar un momento para asegurar que la notificación se procese
+                        time.sleep(0.1)
+                except Exception as e:
+                    print(f"Error al actualizar stock del producto {detalle['cod_producto']}: {str(e)}")
+                    continue
             
             return jsonify({
                 'status': 'success',
@@ -243,8 +250,8 @@ def actualizar_stock():
         if not cod_producto or not cantidad:
             return jsonify({'error': 'Faltan datos requeridos'}), 400
 
-        # Obtener stock actual
-        producto = supabase.table('productos').select('unidades_p').eq('cod_producto', cod_producto).execute()
+        # Obtener producto completo
+        producto = supabase.table('productos').select('*').eq('cod_producto', cod_producto).execute()
         if not producto.data:
             return jsonify({'error': 'Producto no encontrado'}), 404
 
@@ -256,14 +263,14 @@ def actualizar_stock():
             'unidades_p': nuevo_stock
         }).eq('cod_producto', cod_producto).execute()
 
-        # Verificar si el stock sigue bajo después de la actualización
-        if nuevo_stock < 10:
-            mensaje = {
-                'tipo': 'stock_bajo',
-                'producto': producto.data[0]['nombre_p'],
-                'stock': nuevo_stock
-            }
-            notificaciones_queue.put(mensaje)
+        # Enviar notificación de actualización de stock
+        mensaje = {
+            'tipo': 'stock_bajo' if nuevo_stock < 10 else 'stock_actualizado',
+            'producto': producto.data[0]['nombre_p'],
+            'stock': nuevo_stock,
+            'cod_producto': cod_producto
+        }
+        notificaciones_queue.put(mensaje)
 
         return jsonify({
             'success': True,
