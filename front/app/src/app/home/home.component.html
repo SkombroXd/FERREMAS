@@ -1,19 +1,68 @@
 <main class="container">
-    <!-- Alerta de producto agregado -->
-    @if (mostrarAlerta) {
-      <div class="alerta-exito">
-        {{ alertaMensaje }}
+  <!-- Selector de sucursal -->
+  <div class="sucursal-selector">
+    <label for="sucursal">Seleccionar Sucursal:</label>
+    <select id="sucursal" [(ngModel)]="sucursalSeleccionada" (change)="onSucursalChange()">
+      @for (sucursal of sucursales; track sucursal.cod_sucursal) {
+        <option [value]="sucursal.cod_sucursal">{{ sucursal.nombre_sucursal }}</option>
+      }
+    </select>
+  </div>
+
+  <!-- Indicador de carga -->
+  @if (cargando) {
+    <div class="loading">
+      <p>Cargando productos...</p>
+    </div>
+  }
+
+  <!-- Alerta de producto agregado -->
+  @if (mostrarAlerta) {
+    <div class="alerta-exito">
+      {{ alertaMensaje }}
+    </div>
+  }
+
+  <!-- Grid de productos -->
+  <div class="product-grid">
+    @for (producto of productos; track producto.cod_producto) {
+      <div class="product-card">
+        <!-- Imagen del producto -->
+        <div class="product-image">
+          @if (getImagenUrl(producto.imagen_p)) {
+            <img [src]="getImagenUrl(producto.imagen_p)" [alt]="producto.nombre_p" />
+          } @else {
+            <div class="no-image">
+              <span>Sin imagen</span>
+            </div>
+          }
+        </div>
+        
+        <div class="product-info">
+          <h3>{{ producto.nombre_p }}</h3>
+          <p class="codigo">Código: {{ producto.cod_producto }}</p>
+          <p class="precio">${{ producto.precio_p | number:'1.0-0' }}</p>
+          <p class="stock">Stock: {{ producto.unidades_p }} unidades</p>
+          
+          <button 
+            (click)="agregar_productos_carrito(producto)" 
+            [disabled]="producto.unidades_p <= 0"
+            [class.disabled]="producto.unidades_p <= 0">
+            @if (producto.unidades_p > 0) {
+              Añadir al carrito
+            } @else {
+              Sin stock
+            }
+          </button>
+        </div>
       </div>
     }
-    <div class="product-grid">
-      <!-- Producto -->
-       @for (producto of productos; track producto.cod_producto) {
-      <div class="product-card">
-        <div class="product-image"></div>
-        <h3>{{producto.nombre_p}}</h3>
-        <p>{{producto.precio_p}}</p>
-        <button (click)="agregar_productos_carrito(producto)" [disabled]="producto.unidades_p <= 0">Añadir al carrito</button>
-      </div>
-      }
+  </div>
+
+  <!-- Mensaje si no hay productos -->
+  @if (!cargando && productos.length === 0) {
+    <div class="no-products">
+      <p>No hay productos disponibles en esta sucursal</p>
     </div>
-  </main>
+  }
+</main>

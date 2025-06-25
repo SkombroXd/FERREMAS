@@ -1,4 +1,7 @@
 <main class="w-full h-full text-black flex flex-col items-center">
+    <div *ngIf="mostrarAlerta" class="alerta-exito">
+        {{ alertaMensaje }}
+    </div>
     <section class="flex flex-col items-center justify-center">
         <div class="flex items-center gap-2">
             <!-- Botón hamburguesa para historial de alertas -->
@@ -43,7 +46,26 @@
         <!-- Columna 2: Línea vertical -->
         <div class="linea"></div>
 
-        <!-- Columna 3: Gestión de stock -->
+        <!-- Columna 3: Panel lateral con selector de sucursal -->
+        <div class="panel-lateral-container">
+            <!-- Selector de sucursal arriba, fuera del panel-lateral -->
+            <div class="sucursal-selector">
+                <label for="sucursal-select">Seleccionar Sucursal:</label>
+                <select 
+                    id="sucursal-select" 
+                    [(ngModel)]="sucursalSeleccionada" 
+                    (change)="onSucursalChange()"
+                >
+                    @for (sucursal of sucursales; track sucursal.cod_sucursal) {
+                        <option [value]="sucursal.cod_sucursal" class="sucursal-option">
+                            <span class="sucursal-nombre">{{sucursal.nombre_sucursal}}</span>
+                            @if (productosEnAlertaPorSucursal[sucursal.cod_sucursal]) {
+                                <span class="sucursal-alerta"> (❗ {{productosEnAlertaPorSucursal[sucursal.cod_sucursal]}} alertas)</span>
+                            }
+                        </option>
+                    }
+                </select>
+            </div>
         <div class="panel-lateral">
             <div class="dato">
                 <span>Producto</span> <span>|</span> <span>{{productoActual?.nombre_p || '-'}}</span>
@@ -65,6 +87,7 @@
             </div>
             <div class="botones">
                 <button class="pagar" (click)="agregarStock()" [disabled]="!productoActual || cantidadAgregar <= 0">Agregar</button>
+                </div>
             </div>
         </div>
     </div>
@@ -79,12 +102,13 @@
             @if (notificaciones.length === 0) {
                 <p class="text-neutral-500 text-center py-4">No hay alertas activas</p>
             } @else {
-                @for (notificacion of notificaciones; track notificacion.producto) {
+                @for (notificacion of notificaciones; track notificacion.cod_producto + notificacion.cod_sucursal) {
                     <div class="historial-item">
                         <span class="historial-icono">⚠️</span>
                         <div class="historial-info">
                             <p class="historial-producto">{{notificacion.producto}}</p>
                             <p class="historial-stock">Stock: {{notificacion.stock}} unidades</p>
+                            <p class="historial-sucursal">Sucursal: {{notificacion.sucursal}}</p>
                         </div>
                     </div>
                 }

@@ -29,7 +29,11 @@
             "styles": [
               "src/styles.css"
             ],
-            "scripts": []
+            "scripts": [],
+            "allowedCommonJsDependencies": [
+              "google-protobuf",
+              "grpc-web"
+            ]
           },
           "configurations": {
             "production": {

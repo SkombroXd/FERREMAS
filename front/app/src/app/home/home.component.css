@@ -30,56 +30,238 @@
 .container {
   padding: 40px;
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+}
+
+/* Selector de sucursal */
+.sucursal-selector {
+  margin-bottom: 30px;
+  text-align: center;
+  background-color: #3e4f6a;
+  padding: 20px;
+  border-radius: 8px;
+  color: white;
+  width: 100%;
+  max-width: 400px;
+}
+
+.sucursal-selector label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: bold;
+  font-size: 16px;
+}
+
+.sucursal-selector select {
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 4px;
+  background-color: white;
+  color: #333;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.sucursal-selector select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #ea6d6d;
+}
+
+/* Indicador de carga */
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-size: 18px;
+}
+
+/* Mensaje sin productos */
+.no-products {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-size: 18px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  margin-top: 20px;
 }
 
 .product-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 30px;
+  gap: 20px;
   width: 100%;
   max-width: 1200px;
+  justify-items: center;
 }
 
 .product-card {
   background-color: #3e4f6a;
-  padding: 20px;
-  border-radius: 6px;
+  padding: 15px;
+  border-radius: 8px;
   color: white;
   text-align: center;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  width: 250px;
+  height: 420px;
+  display: flex;
+  flex-direction: column;
+}
+
+.product-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.15);
 }
 
 .product-image {
   width: 100%;
-  height: 200px;
+  height: 260px;
   background-color: #2f3c57;
-  background-image: url('https://via.placeholder.com/100?text=+');
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 60px;
-  border-radius: 4px;
-  margin-bottom: 15px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.product-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.no-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #999;
+  font-size: 12px;
+  background-color: #2f3c57;
+  border-radius: 6px;
+}
+
+.product-info {
+  text-align: left;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 120px;
 }
 
 .product-card h3 {
-  margin: 0 0 10px;
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: #fff;
+  line-height: 1.2;
 }
 
-.product-card p {
-  margin: 0 0 15px;
+.product-card .codigo {
+  margin: 3px 0;
+  font-size: 11px;
+  color: #ccc;
+}
+
+.product-card .precio {
+  margin: 6px 0;
+  font-size: 18px;
   font-weight: bold;
+  color: #ea6d6d;
+}
+
+.product-card .stock {
+  margin: 6px 0;
+  font-size: 13px;
+  color: #ccc;
 }
 
 .product-card button {
+  width: 100%;
   background-color: #ea6d6d;
   border: none;
   color: white;
   padding: 10px;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
+  font-size: 13px;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+  margin-top: 8px;
 }
 
-.product-card button:hover {
+.product-card button:hover:not(.disabled) {
   background-color: #c85353;
+}
+
+.product-card button.disabled {
+  background-color: #666;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .container {
+    padding: 20px;
+  }
+  
+  .product-grid {
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+  }
+  
+  .product-card {
+    width: 200px;
+    height: 340px;
+  }
+  
+  .product-image {
+    height: 200px;
+  }
+  
+  .sucursal-selector {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .product-grid {
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+  }
+  
+  .product-card {
+    width: 160px;
+    height: 300px;
+  }
+  
+  .product-image {
+    height: 160px;
+  }
+  
+  .product-card h3 {
+    font-size: 14px;
+  }
+  
+  .product-card .precio {
+    font-size: 16px;
+  }
+  
+  .product-card .stock {
+    font-size: 12px;
+  }
+  
+  .product-card button {
+    font-size: 12px;
+    padding: 8px;
+  }
 }
   

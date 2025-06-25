@@ -3,6 +3,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
+import { ProductosService, SucursalInterface } from '../services/productos.service';
+import { interval } from 'rxjs';
 
 @Component({
   selector: 'app-stock',
@@ -18,14 +20,34 @@ export class StockComponent implements OnInit, OnDestroy {
   productoActual: any = null;
   cantidadAgregar: number = 0;
   mostrarHistorial: boolean = false;
+  sucursales: SucursalInterface[] = [];
+  sucursalSeleccionada: number = 0;
+  productosEnAlertaPorSucursal: { [cod_sucursal: number]: number } = {};
   private eventSource: EventSource | null = null;
   private subscription: Subscription | null = null;
+  mostrarAlerta: boolean = false;
+  alertaMensaje: string = '';
 
-  constructor(private http: HttpClient, private cdr: ChangeDetectorRef, private ngZone: NgZone) {}
+  constructor(
+    private http: HttpClient, 
+    private cdr: ChangeDetectorRef, 
+    private ngZone: NgZone,
+    private productosService: ProductosService
+  ) {}
 
   ngOnInit() {
-    this.cargarProductos();
+    this.cargarSucursales();
     this.iniciarEventSource();
+    
+    // Refrescar datos cada 30 segundos para mantener sincronización
+    this.subscription = new Subscription();
+    this.subscription.add(
+      interval(30000).subscribe(() => {
+        if (this.sucursalSeleccionada > 0) {
+          this.cargarProductosPorSucursal();
+        }
+      })
+    );
   }
 
   ngOnDestroy() {
@@ -35,6 +57,46 @@ export class StockComponent implements OnInit, OnDestroy {
     if (this.subscription) {
       this.subscription.unsubscribe();
     }
+  }
+
+  cargarSucursales() {
+    this.productosService.getSucursales().subscribe({
+      next: (sucursales) => {
+        this.sucursales = sucursales;
+        if (sucursales.length > 0) {
+          this.sucursalSeleccionada = sucursales[0].cod_sucursal;
+          this.cargarProductosPorSucursal();
+        }
+        this.actualizarNotificaciones();
+      },
+      error: (error) => {
+        console.error('Error cargando sucursales:', error);
+      }
+    });
+  }
+
+  cargarProductosPorSucursal() {
+    if (this.sucursalSeleccionada === 0) return;
+    
+    this.productosService.getProductosPorSucursalStock(this.sucursalSeleccionada).subscribe({
+      next: (data) => {
+        this.productos = data.sort((a, b) => a.unidades_p - b.unidades_p);
+        if (this.productoActual) {
+          const productoActualizado = this.productos.find(p => p.cod_producto === this.productoActual.cod_producto);
+          if (productoActualizado) {
+            this.productoActual = productoActualizado;
+          }
+        }
+        this.actualizarNotificaciones();
+      },
+      error: (error) => {
+        console.error('Error al cargar productos:', error);
+      }
+    });
+  }
+
+  onSucursalChange() {
+    this.cargarProductosPorSucursal();
   }
 
   toggleHistorial() {
@@ -70,9 +132,9 @@ export class StockComponent implements OnInit, OnDestroy {
         console.log('StockComponent: Mensaje SSE recibido:', event.data);
         const notificacion = JSON.parse(event.data);
         
-        // Actualizar el producto en la lista si existe
+        // Actualizar el producto en la lista si existe y es de la sucursal actual
         const productoIndex = this.productos.findIndex(p => p.cod_producto === notificacion.cod_producto);
-        if (productoIndex !== -1) {
+        if (productoIndex !== -1 && notificacion.cod_sucursal === this.sucursalSeleccionada) {
           // Actualizar el stock del producto
           this.productos[productoIndex].unidades_p = notificacion.stock;
           
@@ -81,27 +143,38 @@ export class StockComponent implements OnInit, OnDestroy {
             this.productoActual.unidades_p = notificacion.stock;
           }
 
-          // Actualizar notificaciones
-          if (notificacion.tipo === 'stock_bajo') {
-            const existe = this.notificaciones.some(n => n.producto === notificacion.producto);
-            if (!existe) {
-              this.notificaciones.unshift(notificacion);
-            } else {
-              // Actualizar la notificación existente
-              const index = this.notificaciones.findIndex(n => n.producto === notificacion.producto);
-              if (index !== -1) {
-                this.notificaciones[index] = notificacion;
-              }
-            }
-          } else if (notificacion.tipo === 'stock_actualizado') {
-            // Si el stock se actualizó y ya no está bajo, eliminar la notificación
-            this.notificaciones = this.notificaciones.filter(n => n.producto !== notificacion.producto);
-          }
-
           // Ordenar productos por stock
           this.productos = this.productos.sort((a, b) => a.unidades_p - b.unidades_p);
-          this.cdr.detectChanges();
         }
+
+        // Actualizar notificaciones globales
+        if (notificacion.tipo === 'stock_bajo') {
+          const existe = this.notificaciones.some(n => 
+            n.cod_producto === notificacion.cod_producto && 
+            n.cod_sucursal === notificacion.cod_sucursal
+          );
+          if (!existe) {
+            this.notificaciones.unshift(notificacion);
+          } else {
+            // Actualizar la notificación existente
+            const index = this.notificaciones.findIndex(n => 
+              n.cod_producto === notificacion.cod_producto && 
+              n.cod_sucursal === notificacion.cod_sucursal
+            );
+            if (index !== -1) {
+              this.notificaciones[index] = notificacion;
+            }
+          }
+        } else if (notificacion.tipo === 'stock_actualizado') {
+          // Si el stock se actualizó y ya no está bajo, eliminar la notificación
+          this.notificaciones = this.notificaciones.filter(n => 
+            !(n.cod_producto === notificacion.cod_producto && n.cod_sucursal === notificacion.cod_sucursal)
+          );
+        }
+
+        // Actualizar el contador de alertas por sucursal
+        this.actualizarContadorAlertasPorSucursal();
+        this.cdr.detectChanges();
       });
     };
 
@@ -117,18 +190,54 @@ export class StockComponent implements OnInit, OnDestroy {
   }
 
   actualizarNotificaciones() {
-    // Filtrar solo productos con stock bajo
-    const productosStockBajo = this.productos.filter(p => p.unidades_p < 10);
+    // Obtener todas las notificaciones de todas las sucursales
+    this.notificaciones = [];
     
-    // Crear nuevas notificaciones solo para productos con stock bajo
-    this.notificaciones = productosStockBajo.map(producto => ({
-      tipo: 'stock_bajo',
-      producto: producto.nombre_p,
-      stock: producto.unidades_p,
-      cod_producto: producto.cod_producto
-    }));
+    // Consultar cada sucursal para obtener productos con stock bajo
+    this.sucursales.forEach(sucursal => {
+      this.productosService.getProductosPorSucursalStock(sucursal.cod_sucursal).subscribe(productos => {
+        const productosStockBajo = productos.filter(p => p.unidades_p < 10);
+        
+        productosStockBajo.forEach(producto => {
+          const notificacion = {
+            tipo: 'stock_bajo',
+            producto: producto.nombre_p,
+            stock: producto.unidades_p,
+            cod_producto: producto.cod_producto,
+            sucursal: sucursal.nombre_sucursal,
+            cod_sucursal: sucursal.cod_sucursal
+          };
+          
+          // Evitar duplicados
+          const existe = this.notificaciones.some(n => 
+            n.cod_producto === notificacion.cod_producto && 
+            n.cod_sucursal === notificacion.cod_sucursal
+          );
+          
+          if (!existe) {
+            this.notificaciones.push(notificacion);
+          }
+        });
+        
+        this.actualizarContadorAlertasPorSucursal();
+        this.cdr.detectChanges();
+      });
+    });
+  }
 
-    this.cdr.detectChanges();
+  actualizarContadorAlertasPorSucursal() {
+    // Limpiar contador anterior
+    this.productosEnAlertaPorSucursal = {};
+    
+    // Contar productos en alerta por sucursal
+    this.notificaciones.forEach(notificacion => {
+      if (notificacion.tipo === 'stock_bajo') {
+        if (!this.productosEnAlertaPorSucursal[notificacion.cod_sucursal]) {
+          this.productosEnAlertaPorSucursal[notificacion.cod_sucursal] = 0;
+        }
+        this.productosEnAlertaPorSucursal[notificacion.cod_sucursal]++;
+      }
+    });
   }
 
   verificarStockBajo() {
@@ -174,37 +283,38 @@ export class StockComponent implements OnInit, OnDestroy {
 
     this.http.post('http://localhost:5000/api/actualizar-stock', {
       cod_producto: this.productoActual.cod_producto,
+      cod_sucursal: this.sucursalSeleccionada,
       cantidad: this.cantidadAgregar
     }).subscribe(
       (response: any) => {
         // Actualizar el producto actual
         this.productoActual.unidades_p = response.stock_actual;
-        
         // Actualizar el producto en la lista
         const productoIndex = this.productos.findIndex(p => p.cod_producto === this.productoActual.cod_producto);
         if (productoIndex !== -1) {
           this.productos[productoIndex].unidades_p = response.stock_actual;
         }
-        
         this.cantidadAgregar = 0;
         this.productos = this.productos.sort((a, b) => a.unidades_p - b.unidades_p);
+        // Actualizar notificaciones después de agregar stock
+        this.actualizarNotificaciones();
         this.cdr.detectChanges();
-
-        // Actualizar notificaciones
-        if (this.productoActual.unidades_p < 10) {
-          const notificacion = {
-            tipo: 'stock_bajo',
-            producto: this.productoActual.nombre_p,
-            stock: this.productoActual.unidades_p,
-            cod_producto: this.productoActual.cod_producto
-          };
-          this.agregarNotificacion(notificacion);
-        } else {
-          this.notificaciones = this.notificaciones.filter(n => n.producto !== this.productoActual.nombre_p);
-        }
+        // Mostrar alerta de éxito
+        this.alertaMensaje = 'Stock de producto actualizado';
+        this.mostrarAlerta = true;
+        setTimeout(() => {
+          this.mostrarAlerta = false;
+          this.alertaMensaje = '';
+        }, 3000);
       },
       (error) => {
         console.error('Error al actualizar stock:', error);
+        this.alertaMensaje = 'Error al actualizar stock';
+        this.mostrarAlerta = true;
+        setTimeout(() => {
+          this.mostrarAlerta = false;
+          this.alertaMensaje = '';
+        }, 3000);
       }
     );
   }
@@ -214,6 +324,10 @@ export class StockComponent implements OnInit, OnDestroy {
   }
 
   estaEnAlertas(producto: any): boolean {
-    return this.notificaciones.some(n => n.producto === producto.nombre_p && n.tipo === 'stock_bajo');
+    return this.notificaciones.some(n => 
+      n.cod_producto === producto.cod_producto && 
+      n.cod_sucursal === this.sucursalSeleccionada &&
+      n.tipo === 'stock_bajo'
+    );
   }
 }

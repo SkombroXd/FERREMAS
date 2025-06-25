@@ -5,6 +5,72 @@ body {
   font-family: Arial, sans-serif;
 }
 
+/* Selector de sucursal */
+.sucursal-selector {
+  text-align: center;
+  background-color: #3e4f6a;
+  padding: 15px;
+  border-radius: 8px;
+  color: white;
+  box-sizing: border-box;
+  margin-top: 37%;
+  margin-right: 40%;
+  display: flex
+;
+    flex-direction: column;
+    height: fit-content;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+    /* margin-top: 50%; */
+    margin-right: 20%;
+}
+
+.sucursal-selector label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.sucursal-selector select {
+  width: 100%;
+  padding: 8px;
+  border: none;
+  border-radius: 4px;
+  background-color: white;
+  color: #333;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sucursal-selector select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px #ea6d6d;
+}
+
+.sucursal-selector select option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px;
+}
+
+.sucursal-nombre {
+  text-align: left;
+}
+
+.sucursal-alerta {
+  text-align: right;
+  color: #e74c3c;
+  font-weight: bold;
+}
+
+/* Contenedor del panel lateral */
+.panel-lateral-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
 .parent {
   height: 90dvh;
   display: grid;
@@ -206,6 +272,13 @@ body {
   color: #666;
 }
 
+.historial-sucursal {
+  margin: 3px 0 0;
+  font-size: 12px;
+  color: #0070f3;
+  font-weight: 500;
+}
+
 .historial-eliminar {
   background: none;
   border: none;
@@ -239,7 +312,7 @@ body {
 }
 
 .tabla-compra th {
-  background-color: #0070f3;
+  background-color: #3e4f6a;
   color: white;
   font-weight: 600;
   padding: 14px;
@@ -277,7 +350,7 @@ body {
   gap: 20px;
   height: fit-content;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
-  margin-top: 50%;
+  margin-top: 10%;
   margin-right: 20%;
 }
 
@@ -370,6 +443,62 @@ button.pagar:hover {
 
 .stock-input:focus {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+/* Responsive para el selector de sucursal */
+@media (max-width: 768px) {
+  .sucursal-selector {
+    margin-bottom: 15px;
+  }
+  
+  .sucursal-selector label {
+    font-size: 13px;
+  }
+  
+  .sucursal-selector select {
+    font-size: 12px;
+    padding: 6px;
+  }
+}
+
+@media (max-width: 480px) {
+  .sucursal-selector {
+    padding: 12px;
+  }
+  
+  .sucursal-selector label {
+    font-size: 12px;
+  }
+  
+  .sucursal-selector select {
+    font-size: 11px;
+    padding: 5px;
+  }
+}
+
+.alerta-exito {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: #4CAF50;
+  color: white;
+  padding: 15px 25px;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  z-index: 1000;
+  animation: slideIn 0.5s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translate(-50%, -100%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
 }

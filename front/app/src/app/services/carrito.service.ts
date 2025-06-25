@@ -1,12 +1,13 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
+import { ProductoInterface } from './productos.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class CarritoService {
-  private carrito: any[] = [];
-  private carritoSubject = new BehaviorSubject<any[]>([]);
+  private carrito: ProductoInterface[] = [];
+  private carritoSubject = new BehaviorSubject<ProductoInterface[]>([]);
 
   constructor() {
     // Inicializar el carrito desde localStorage si existe
@@ -20,11 +21,11 @@ export class CarritoService {
     window.addEventListener('storage', this.syncCarritoFromLocalStorage.bind(this));
   }
 
-  getCarrito(): Observable<any[]> {
+  getCarrito(): Observable<ProductoInterface[]> {
     return this.carritoSubject.asObservable();
   }
 
-  agregarProducto(producto: any) {
+  agregarProducto(producto: ProductoInterface) {
     console.log('Agregando producto al carrito:', producto);
     this.carrito.push(producto);
     this.actualizarCarrito();
@@ -53,7 +54,7 @@ export class CarritoService {
     this.actualizarCarrito();
   }
 
-  obtenerCarrito(): any[] {
+  obtenerCarrito(): ProductoInterface[] {
     return this.carrito;
   }
 

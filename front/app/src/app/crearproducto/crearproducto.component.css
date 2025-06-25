@@ -1,0 +1,115 @@
+body {
+  margin: 0;
+  padding: 20px;
+  background-color: #ececf2;
+  font-family: Arial, sans-serif;
+}
+
+.parent {
+  height: 90dvh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #ececf2;
+  padding: 6px 4px;
+  box-sizing: border-box;
+}
+
+.crearproducto-panel {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+  padding: 32px 40px;
+  min-width: 350px;
+  max-width: 400px;
+  width: 100%;
+  border: 1px solid #ccc;
+}
+
+.crearproducto-panel h2 {
+  margin-top: 0;
+  margin-bottom: 24px;
+  color: #333;
+  text-align: center;
+  font-weight: 600;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 18px;
+}
+
+.form-group label {
+  margin-bottom: 6px;
+  font-weight: 600;
+  color: #1a202c;
+}
+
+.form-group input[type="text"],
+.form-group input[type="number"],
+.form-group input[type="file"],
+.form-group textarea {
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 16px;
+  background-color: #fafafa;
+  transition: all 0.3s ease;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="number"]:focus,
+.form-group textarea:focus {
+  border-color: #0070f3;
+  outline: none;
+  background-color: white;
+  box-shadow: 0 0 0 3px rgba(0, 112, 243, 0.1);
+}
+
+.form-group input[type="file"] {
+  background-color: #e8f0fe;
+  border-color: #0070f3;
+  cursor: pointer;
+}
+
+.form-group input[type="file"]:hover {
+  background-color: #d1e7ff;
+}
+
+.botones {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+button {
+  flex: 1;
+  padding: 12px;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  font-size: 16px;
+}
+
+button.cancelar {
+  background-color: #ff5f5f;
+  color: white;
+}
+
+button.cancelar:hover {
+  background-color: #e64545;
+}
+
+button.crear {
+  background-color: #00c853;
+  color: white;
+}
+
+button.crear:hover {
+  background-color: #00b248;
+}
+
