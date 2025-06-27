@@ -60,21 +60,13 @@ def verificar_stock_bajo():
                         'stock': item['unidades'],
                         'cod_producto': item['productos']['cod_producto'],
                         'sucursal': item['sucursal']['nombre_sucursal'],
-                        'cod_sucursal': item['cod_sucursal'],
-                        'timestamp': datetime.utcnow().isoformat()
+                        'cod_sucursal': item['cod_sucursal']
                     }
                     notificaciones_queue.put(mensaje)
             
             time.sleep(60)  # Verificar cada minuto
         except Exception as e:
             print(f"Error en verificación de stock: {str(e)}")
-            # Enviar notificación de error
-            error_msg = {
-                'tipo': 'error_verificacion',
-                'mensaje': f'Error en verificación de stock: {str(e)}',
-                'timestamp': datetime.utcnow().isoformat()
-            }
-            notificaciones_queue.put(error_msg)
             time.sleep(60)
 
 # Iniciar thread de verificación de stock
@@ -83,112 +75,15 @@ threading.Thread(target=verificar_stock_bajo, daemon=True).start()
 @app.route('/api/notificaciones', methods=['GET'])
 def notificaciones():
     def generar_eventos():
-        print(f"👥 Nueva conexión SSE: {request.remote_addr}")
-        try:
-            # Mensaje de conexión exitosa
-            yield f"data: {json.dumps({'tipo': 'conexion', 'mensaje': 'Conexión SSE establecida', 'timestamp': datetime.utcnow().isoformat()})}\n\n"
-            
         while True:
             try:
                 mensaje = notificaciones_queue.get()
-                    # Agregar timestamp si no existe
-                    if 'timestamp' not in mensaje:
-                        mensaje['timestamp'] = datetime.utcnow().isoformat()
                 yield f"data: {json.dumps(mensaje)}\n\n"
             except Exception as e:
                 print(f"Error en SSE: {str(e)}")
-                    # Enviar evento de error personalizado
-                    error_msg = {
-                        'tipo': 'error',
-                        'mensaje': f'Error en el servidor: {str(e)}',
-                        'timestamp': datetime.utcnow().isoformat()
-                    }
-                    yield f"event: error\ndata: {json.dumps(error_msg)}\n\n"
                 time.sleep(1)
-        except Exception as e:
-            print(f"Error fatal en SSE: {str(e)}")
-            # Enviar evento de cierre
-            yield f"event: close\ndata: {json.dumps({'tipo': 'cierre', 'mensaje': 'Conexión cerrada por error del servidor'})}\n\n"
 
     return Response(generar_eventos(), mimetype='text/event-stream')
-
-@app.route('/api/test-sse', methods=['POST'])
-def test_sse():
-    """Endpoint para probar envío manual de mensajes SSE"""
-    try:
-        data = request.get_json() or {}
-        mensaje = {
-            'tipo': 'manual',
-            'mensaje': data.get('mensaje', 'Esto es una prueba manual'),
-            'timestamp': datetime.utcnow().isoformat(),
-            'cod_producto': data.get('cod_producto', 'TEST001'),
-            'cod_sucursal': data.get('cod_sucursal', 1),
-            'stock': data.get('stock', 5)
-        }
-        notificaciones_queue.put(mensaje)
-        return jsonify({"ok": True, "mensaje": "Mensaje enviado a la cola SSE"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/sse-rendimiento')
-def sse_rendimiento():
-    """Endpoint para pruebas de rendimiento enviando 1000 mensajes"""
-    try:
-        for i in range(1000):
-            mensaje = {
-                "tipo": "stock_bajo",
-                "mensaje": f"msg {i}",
-                "cod_producto": f"prod_{i}",
-                "cod_sucursal": 1,
-                "stock": 9,
-                "timestamp": datetime.utcnow().isoformat()
-            }
-            notificaciones_queue.put(mensaje)
-        return jsonify({"status": "enviados", "cantidad": 1000})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/sse-orden')
-def sse_orden():
-    """Endpoint para probar orden de mensajes con timestamps"""
-    try:
-        for i in range(10):
-            mensaje = {
-                'tipo': 'orden',
-                'mensaje': f'Mensaje ordenado {i}',
-                'timestamp': datetime.utcnow().isoformat(),
-                'secuencia': i
-            }
-            notificaciones_queue.put(mensaje)
-            time.sleep(0.1)  # Pequeña pausa para ver el orden
-        return jsonify({"status": "enviados", "cantidad": 10})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/sse-error-json')
-def sse_error_json():
-    """Endpoint para probar manejo de JSON malformado"""
-    try:
-        # Enviar JSON malformado intencionalmente
-        mensaje_malformado = '{"rompe_json":'
-        notificaciones_queue.put(mensaje_malformado)
-        return jsonify({"status": "error enviado"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/api/sse-cierre')
-def sse_cierre():
-    """Endpoint para probar cierre de conexión desde servidor"""
-    try:
-        mensaje_cierre = {
-            'tipo': 'cierre',
-            'mensaje': 'Conexión será cerrada por el servidor',
-            'timestamp': datetime.utcnow().isoformat()
-        }
-        notificaciones_queue.put(mensaje_cierre)
-        return jsonify({"status": "mensaje de cierre enviado"})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/create-transaction', methods=['POST'])
 def create_transaction():
@@ -378,10 +273,7 @@ def commit_transaction_post():
                                 'producto': producto.data[0]['nombre_p'],
                                 'stock': nuevo_stock,
                                 'cod_producto': detalle['cod_producto'],
-                                'sucursal': 1,
-                                'timestamp': datetime.utcnow().isoformat(),
-                                'accion': 'actualizacion_manual',
-                                'cantidad_agregada': detalle['unidades_c']
+                                'sucursal': 1
                             }
                             notificaciones_queue.put(mensaje)
                             
@@ -447,10 +339,7 @@ def actualizar_stock():
             'producto': producto.data[0]['nombre_p'],
             'stock': nuevo_stock,
             'cod_producto': cod_producto,
-            'sucursal': cod_sucursal,
-            'timestamp': datetime.utcnow().isoformat(),
-            'accion': 'actualizacion_manual',
-            'cantidad_agregada': cantidad
+            'sucursal': cod_sucursal
         }
         notificaciones_queue.put(mensaje)
 
@@ -504,10 +393,7 @@ def agregar_stock():
             'producto': producto.data[0]['nombre_p'],
             'stock': nuevo_stock,
             'cod_producto': cod_producto,
-            'sucursal': cod_sucursal,
-            'timestamp': datetime.utcnow().isoformat(),
-            'accion': 'actualizacion_manual',
-            'cantidad_agregada': cantidad
+            'sucursal': cod_sucursal
         }
         notificaciones_queue.put(mensaje)
 

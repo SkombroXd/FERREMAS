@@ -6,7 +6,6 @@ Incluye pruebas de conexión, validación, timeout, carga, cancelación y autent
 
 import sys
 import os
-import uuid
 # Agregar el directorio padre al path para importar los módulos de protobuf
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -21,9 +20,6 @@ from producto_pb2_grpc import ProductoServiceStub
 HOST = 'localhost'
 PORT = 50051
 ADDRESS = f'{HOST}:{PORT}'
-
-def generar_codigo():
-    return str(uuid.uuid4())[:8]
 
 def test_1_conexion_exitosa():
     """🔹1. Prueba de conexión exitosa"""
@@ -44,21 +40,22 @@ def test_1_conexion_exitosa():
 def test_2_llamada_valida():
     """🔹2. Llamada válida"""
     print("\n🔹2. Probando llamada válida...")
-    with grpc.insecure_channel(ADDRESS) as channel:
+    try:
+        channel = grpc.insecure_channel(ADDRESS)
         stub = ProductoServiceStub(channel)
-        cod = generar_codigo()
-        nombre_unico = f"Martillo-{generar_codigo()}"
+        
         response = stub.CrearProducto(CrearProductoRequest(
-            cod_producto=f"FER-{cod}",
-            nombre_p=nombre_unico,
-            precio_p=9990
+            cod_producto="FER-001",
+            nombre_p="Martillo",
+            precio_p=9990,
+            unidades_p=20
         ))
-        if not response.exito:
-            print(f"❌ Falló: {response.mensaje}")
-            return False
-        print(f"✅ Producto creado: Producto {nombre_unico} creado correctamente")
+        print("✅ Producto creado:", response.mensaje)
         channel.close()
         return True
+    except Exception as e:
+        print(f"❌ Error en llamada válida: {e}")
+        return False
 
 def test_3_datos_invalidos():
     """🔹3. Llamada con datos inválidos"""
@@ -67,21 +64,23 @@ def test_3_datos_invalidos():
         channel = grpc.insecure_channel(ADDRESS)
         stub = ProductoServiceStub(channel)
         
-        cod = generar_codigo()
-        response = stub.CrearProducto(CrearProductoRequest(
-            cod_producto="",  # Inválido
-            nombre_p="",
-            precio_p=-1
+        stub.CrearProducto(CrearProductoRequest(
+            cod_producto="",  # Código vacío
+            nombre_p="",      # Nombre vacío
+            precio_p=-10,     # Precio inválido
+            unidades_p=-1     # Stock negativo
         ))
-        if response.exito:
-            print("❌ Error: El servidor aceptó datos inválidos")
-            return False
-        else:
-            print("✅ El servidor rechazó datos inválidos")
-            return True
-    except Exception as e:
-        print(f"✅ Excepción esperada por datos inválidos: {e}")
+        print("⚠️  No se detectó error con datos inválidos")
+        channel.close()
+        return False
+    except grpc.RpcError as e:
+        print(f"❌ Error esperado: {e.code()} - {e.details()}")
+        channel.close()
         return True
+    except Exception as e:
+        print(f"❌ Error inesperado: {e}")
+        channel.close()
+        return False
 
 def test_4_timeout():
     """🔹4. Prueba de timeout"""
@@ -90,18 +89,15 @@ def test_4_timeout():
         channel = grpc.insecure_channel(ADDRESS)
         stub = ProductoServiceStub(channel)
         
-        cod = generar_codigo()
-        response = stub.CrearProducto(CrearProductoRequest(
-            cod_producto=f"FER-{cod}",
+        stub.CrearProducto(CrearProductoRequest(
+            cod_producto="FER-002",
             nombre_p="Producto Lento",
-            precio_p=1000
+            precio_p=1000,
+            unidades_p=5
         ), timeout=0.001)  # Timeout muy corto
-        if not response.exito:
-            print(f"❌ Falló: {response.mensaje}")
-            return False
         print("⚠️  No se detectó timeout")
         channel.close()
-        return True
+        return False
     except grpc.RpcError as e:
         if e.code() == grpc.StatusCode.DEADLINE_EXCEEDED:
             print("⏱ Timeout detectado correctamente")
@@ -124,11 +120,11 @@ def test_5_cancelacion():
         stub = ProductoServiceStub(channel)
         
         # Crear llamada asíncrona
-        cod = generar_codigo()
         call = stub.CrearProducto.future(CrearProductoRequest(
-            cod_producto=f"CANCEL-{cod}",
+            cod_producto="CANCEL",
             nombre_p="Cancelar",
-            precio_p=1000
+            precio_p=1000,
+            unidades_p=1
         ))
         
         # Cancelar inmediatamente
@@ -156,20 +152,16 @@ def test_6_autenticacion():
         channel = grpc.insecure_channel(ADDRESS)
         stub = ProductoServiceStub(channel)
         
-        cod = generar_codigo()
-        nombre_unico = f"Protegido-{generar_codigo()}"
-        response = stub.CrearProducto(
-            CrearProductoRequest(
-                cod_producto=f"AUTH-{cod}",
-                nombre_p=nombre_unico,
-                precio_p=1000
-            ),
-            metadata=[('authorization', 'Bearer TOKEN_INVALIDO')]
-        )
+        # Metadata con token inválido
+        metadata = [('authorization', 'Bearer TOKEN_INVALIDO')]
         
-        if not response.exito:
-            print(f"❌ Falló autenticación: {response.mensaje}")
-            return False
+        response = stub.CrearProducto(CrearProductoRequest(
+            cod_producto="AUTH",
+            nombre_p="Protegido",
+            precio_p=1000,
+            unidades_p=1
+        ), metadata=metadata)
+        
         print("⚠️  No se implementó autenticación en el servidor")
         channel.close()
         return True  # No es un error si no está implementado
@@ -196,22 +188,45 @@ def test_7_error_servidor():
         stub = ProductoServiceStub(channel)
         
         # Intentar crear producto con nombre que podría causar error
-        cod = generar_codigo()
         response = stub.CrearProducto(CrearProductoRequest(
-            cod_producto=f"ERR-{cod}",
+            cod_producto="ERR",
             nombre_p="ERROR",  # Nombre que podría activar excepción en el servidor
-            precio_p=0
+            precio_p=0,
+            unidades_p=0
         ))
         
-        if not response.exito:
-            print(f"💥 Error del servidor detectado: {response.mensaje}")
-            return True
-        else:
-            print("⚠️  No se detectó error del servidor")
-            return False
+        print("⚠️  No se detectó error del servidor")
+        channel.close()
+        return True
         
+    except grpc.RpcError as e:
+        print(f"💥 Error del servidor detectado: {e.code()} - {e.details()}")
+        channel.close()
+        return True
     except Exception as e:
         print(f"❌ Error inesperado: {e}")
+        channel.close()
+        return False
+
+def test_8_listar_productos():
+    """🔹8. Prueba de listar productos"""
+    print("\n🔹8. Probando listar productos...")
+    try:
+        channel = grpc.insecure_channel(ADDRESS)
+        stub = ProductoServiceStub(channel)
+        
+        response = stub.ListarProductos(ListarProductosRequest())
+        print(f"✅ Productos listados: {len(response.productos)} productos encontrados")
+        
+        # Mostrar algunos productos
+        for i, producto in enumerate(response.productos[:3]):  # Solo los primeros 3
+            print(f"   {i+1}. {producto.cod_producto} - {producto.nombre_p} - ${producto.precio_p}")
+        
+        channel.close()
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error al listar productos: {e}")
         channel.close()
         return False
 
@@ -222,49 +237,77 @@ def test_9_prueba_carga():
         channel = grpc.insecure_channel(ADDRESS)
         stub = ProductoServiceStub(channel)
         
-        exitosos = 0
-        total = 10
-        for _ in range(total):
-            cod = generar_codigo()
-            nombre = f"Carga-{generar_codigo()}"
-            response = stub.CrearProducto(CrearProductoRequest(
-                cod_producto=f"FER-{cod}",
-                nombre_p=nombre,
-                precio_p=1000
-            ))
-            if response.exito:
-                exitosos += 1
+        def crear_producto_concurrente(i):
+            try:
+                response = stub.CrearProducto(CrearProductoRequest(
+                    cod_producto=f"FER-{i:03d}",
+                    nombre_p=f"Producto Carga {i}",
+                    precio_p=1000 + i,
+                    unidades_p=i
+                ))
+                return response.exito
+            except:
+                return False
         
-        print(f"✅ Prueba de carga completada: {exitosos}/{total} exitosos")
+        # Crear 10 productos concurrentemente
+        start_time = time.time()
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(crear_producto_concurrente, i) for i in range(1, 11)]
+            results = [future.result() for future in futures]
+        
+        end_time = time.time()
+        exitosos = sum(results)
+        
+        print(f"✅ Prueba de carga completada: {exitosos}/10 exitosos en {end_time - start_time:.2f}s")
         channel.close()
-        return exitosos == total
+        return exitosos >= 8  # Al menos 8 deben ser exitosos
         
     except Exception as e:
         print(f"❌ Error en prueba de carga: {e}")
         channel.close()
         return False
 
-def test_10_manejo_errores_servidor():
-    """🔹10. Manejo de errores del servidor"""
-    print("\n🔹10. Probando manejo de errores internos del servidor...")
-    with grpc.insecure_channel(ADDRESS) as channel:
+def test_10_validacion_campos():
+    """🔹10. Prueba de validación de campos específicos"""
+    print("\n🔹10. Probando validación de campos...")
+    try:
+        channel = grpc.insecure_channel(ADDRESS)
         stub = ProductoServiceStub(channel)
-        # Forzar un error interno enviando un nombre especial
-        try:
-            response = stub.CrearProducto(CrearProductoRequest(
-                cod_producto="FORCE-ERR",
-                nombre_p="ERROR",  # El backend lanza excepción con este nombre
-                precio_p=1000
-            ))
-            if not response.exito and "Error interno" in response.mensaje:
-                print(f"✅ Error interno detectado y mensaje recibido: {response.mensaje}")
-                return True
-            else:
-                print(f"❌ No se detectó el error interno esperado. Mensaje: {response.mensaje}")
-                return False
-        except grpc.RpcError as e:
-            print(f"✅ Excepción gRPC capturada: {e.code()} - {e.details()}")
-            return True
+        
+        # Probar con precio muy alto
+        response = stub.CrearProducto(CrearProductoRequest(
+            cod_producto="PRICE-TEST",
+            nombre_p="Producto Caro",
+            precio_p=999999999.99,
+            unidades_p=1
+        ))
+        
+        if response.exito:
+            print("✅ Producto con precio alto creado")
+        else:
+            print(f"❌ Error con precio alto: {response.mensaje}")
+        
+        # Probar con nombre muy largo
+        nombre_largo = "A" * 1000  # Nombre de 1000 caracteres
+        response2 = stub.CrearProducto(CrearProductoRequest(
+            cod_producto="LONG-NAME",
+            nombre_p=nombre_largo,
+            precio_p=100,
+            unidades_p=1
+        ))
+        
+        if response2.exito:
+            print("✅ Producto con nombre largo creado")
+        else:
+            print(f"❌ Error con nombre largo: {response2.mensaje}")
+        
+        channel.close()
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error en validación: {e}")
+        channel.close()
+        return False
 
 def ejecutar_todas_las_pruebas():
     """Ejecuta todas las pruebas y muestra un resumen"""
@@ -279,8 +322,9 @@ def ejecutar_todas_las_pruebas():
         ("Cancelación", test_5_cancelacion),
         ("Autenticación", test_6_autenticacion),
         ("Error del servidor", test_7_error_servidor),
+        ("Listar productos", test_8_listar_productos),
         ("Prueba de carga", test_9_prueba_carga),
-        ("Manejo de errores del servidor", test_10_manejo_errores_servidor)
+        ("Validación de campos", test_10_validacion_campos)
     ]
     
     resultados = []

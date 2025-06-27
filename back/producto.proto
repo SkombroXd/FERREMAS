@@ -5,14 +5,14 @@ package productos;
 service ProductoService {
   rpc CrearProducto (CrearProductoRequest) returns (CrearProductoResponse);
   rpc ListarProductos (ListarProductosRequest) returns (ListarProductosResponse);
-  rpc AsignarProductoASucursal (AsignarProductoRequest) returns (RespuestaGeneral);
 }
 
 message CrearProductoRequest {
   string cod_producto = 1;
   string nombre_p = 2;
   double precio_p = 3;
-  bytes imagen = 4; // Imagen en binario (opcional)
+  int32 unidades_p = 4;
+  bytes imagen = 5; // Imagen en binario
 }
 
 message CrearProductoResponse {
@@ -34,15 +34,4 @@ message Producto {
 
 message ListarProductosResponse {
   repeated Producto productos = 1;
-}
-
-message AsignarProductoRequest {
-  string cod_producto = 1;
-  int32 cod_sucursal = 2;
-  int32 unidades = 3;
-}
-
-message RespuestaGeneral {
-  bool exito = 1;
-  string mensaje = 2;
 } 
