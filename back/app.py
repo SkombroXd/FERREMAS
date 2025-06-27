@@ -60,13 +60,21 @@ def verificar_stock_bajo():
                         'stock': item['unidades'],
                         'cod_producto': item['productos']['cod_producto'],
                         'sucursal': item['sucursal']['nombre_sucursal'],
-                        'cod_sucursal': item['cod_sucursal']
+                        'cod_sucursal': item['cod_sucursal'],
+                        'timestamp': datetime.utcnow().isoformat()
                     }
                     notificaciones_queue.put(mensaje)
             
             time.sleep(60)  # Verificar cada minuto
         except Exception as e:
             print(f"Error en verificación de stock: {str(e)}")
+            # Enviar notificación de error
+            error_msg = {
+                'tipo': 'error_verificacion',
+                'mensaje': f'Error en verificación de stock: {str(e)}',
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            notificaciones_queue.put(error_msg)
             time.sleep(60)
 
 # Iniciar thread de verificación de stock
@@ -75,15 +83,112 @@ threading.Thread(target=verificar_stock_bajo, daemon=True).start()
 @app.route('/api/notificaciones', methods=['GET'])
 def notificaciones():
     def generar_eventos():
+        print(f"👥 Nueva conexión SSE: {request.remote_addr}")
+        try:
+            # Mensaje de conexión exitosa
+            yield f"data: {json.dumps({'tipo': 'conexion', 'mensaje': 'Conexión SSE establecida', 'timestamp': datetime.utcnow().isoformat()})}\n\n"
+            
         while True:
             try:
                 mensaje = notificaciones_queue.get()
+                    # Agregar timestamp si no existe
+                    if 'timestamp' not in mensaje:
+                        mensaje['timestamp'] = datetime.utcnow().isoformat()
                 yield f"data: {json.dumps(mensaje)}\n\n"
             except Exception as e:
                 print(f"Error en SSE: {str(e)}")
+                    # Enviar evento de error personalizado
+                    error_msg = {
+                        'tipo': 'error',
+                        'mensaje': f'Error en el servidor: {str(e)}',
+                        'timestamp': datetime.utcnow().isoformat()
+                    }
+                    yield f"event: error\ndata: {json.dumps(error_msg)}\n\n"
                 time.sleep(1)
+        except Exception as e:
+            print(f"Error fatal en SSE: {str(e)}")
+            # Enviar evento de cierre
+            yield f"event: close\ndata: {json.dumps({'tipo': 'cierre', 'mensaje': 'Conexión cerrada por error del servidor'})}\n\n"
 
     return Response(generar_eventos(), mimetype='text/event-stream')
+
+@app.route('/api/test-sse', methods=['POST'])
+def test_sse():
+    """Endpoint para probar envío manual de mensajes SSE"""
+    try:
+        data = request.get_json() or {}
+        mensaje = {
+            'tipo': 'manual',
+            'mensaje': data.get('mensaje', 'Esto es una prueba manual'),
+            'timestamp': datetime.utcnow().isoformat(),
+            'cod_producto': data.get('cod_producto', 'TEST001'),
+            'cod_sucursal': data.get('cod_sucursal', 1),
+            'stock': data.get('stock', 5)
+        }
+        notificaciones_queue.put(mensaje)
+        return jsonify({"ok": True, "mensaje": "Mensaje enviado a la cola SSE"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/sse-rendimiento')
+def sse_rendimiento():
+    """Endpoint para pruebas de rendimiento enviando 1000 mensajes"""
+    try:
+        for i in range(1000):
+            mensaje = {
+                "tipo": "stock_bajo",
+                "mensaje": f"msg {i}",
+                "cod_producto": f"prod_{i}",
+                "cod_sucursal": 1,
+                "stock": 9,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+            notificaciones_queue.put(mensaje)
+        return jsonify({"status": "enviados", "cantidad": 1000})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/sse-orden')
+def sse_orden():
+    """Endpoint para probar orden de mensajes con timestamps"""
+    try:
+        for i in range(10):
+            mensaje = {
+                'tipo': 'orden',
+                'mensaje': f'Mensaje ordenado {i}',
+                'timestamp': datetime.utcnow().isoformat(),
+                'secuencia': i
+            }
+            notificaciones_queue.put(mensaje)
+            time.sleep(0.1)  # Pequeña pausa para ver el orden
+        return jsonify({"status": "enviados", "cantidad": 10})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/sse-error-json')
+def sse_error_json():
+    """Endpoint para probar manejo de JSON malformado"""
+    try:
+        # Enviar JSON malformado intencionalmente
+        mensaje_malformado = '{"rompe_json":'
+        notificaciones_queue.put(mensaje_malformado)
+        return jsonify({"status": "error enviado"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/sse-cierre')
+def sse_cierre():
+    """Endpoint para probar cierre de conexión desde servidor"""
+    try:
+        mensaje_cierre = {
+            'tipo': 'cierre',
+            'mensaje': 'Conexión será cerrada por el servidor',
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        notificaciones_queue.put(mensaje_cierre)
+        return jsonify({"status": "mensaje de cierre enviado"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/create-transaction', methods=['POST'])
 def create_transaction():
@@ -273,7 +378,10 @@ def commit_transaction_post():
                                 'producto': producto.data[0]['nombre_p'],
                                 'stock': nuevo_stock,
                                 'cod_producto': detalle['cod_producto'],
-                                'sucursal': 1
+                                'sucursal': 1,
+                                'timestamp': datetime.utcnow().isoformat(),
+                                'accion': 'actualizacion_manual',
+                                'cantidad_agregada': detalle['unidades_c']
                             }
                             notificaciones_queue.put(mensaje)
                             
@@ -339,7 +447,10 @@ def actualizar_stock():
             'producto': producto.data[0]['nombre_p'],
             'stock': nuevo_stock,
             'cod_producto': cod_producto,
-            'sucursal': cod_sucursal
+            'sucursal': cod_sucursal,
+            'timestamp': datetime.utcnow().isoformat(),
+            'accion': 'actualizacion_manual',
+            'cantidad_agregada': cantidad
         }
         notificaciones_queue.put(mensaje)
 
@@ -351,6 +462,67 @@ def actualizar_stock():
 
     except Exception as e:
         print(f"Error al actualizar stock: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/agregar-stock', methods=['PUT', 'PATCH'])
+def agregar_stock():
+    try:
+        data = request.get_json()
+        cod_producto = data.get('cod_producto')
+        cod_sucursal = data.get('cod_sucursal', 1)  # Default a sucursal 1 si no se especifica
+        cantidad = data.get('cantidad')
+
+        if not cod_producto or not cantidad:
+            return jsonify({'error': 'Faltan datos requeridos'}), 400
+
+        # Validar que la cantidad sea positiva
+        if cantidad <= 0:
+            return jsonify({'error': 'La cantidad debe ser mayor a 0'}), 400
+
+        # Obtener producto completo
+        producto = supabase.table('productos').select('*').eq('cod_producto', cod_producto).execute()
+        if not producto.data:
+            return jsonify({'error': 'Producto no encontrado'}), 404
+
+        # Obtener stock actual de la sucursal
+        stock_actual_response = supabase.table('producto_sucursal').select('unidades').eq('cod_producto', cod_producto).eq('cod_sucursal', cod_sucursal).execute()
+        
+        if not stock_actual_response.data:
+            return jsonify({'error': 'Registro de stock no encontrado para esta sucursal'}), 404
+        
+        stock_actual = stock_actual_response.data[0]['unidades']
+        nuevo_stock = stock_actual + cantidad
+
+        # Actualizar stock en la sucursal específica
+        supabase.table('producto_sucursal').update({
+            'unidades': nuevo_stock
+        }).eq('cod_producto', cod_producto).eq('cod_sucursal', cod_sucursal).execute()
+
+        # Enviar notificación de actualización de stock
+        mensaje = {
+            'tipo': 'stock_bajo' if nuevo_stock < 10 else 'stock_actualizado',
+            'producto': producto.data[0]['nombre_p'],
+            'stock': nuevo_stock,
+            'cod_producto': cod_producto,
+            'sucursal': cod_sucursal,
+            'timestamp': datetime.utcnow().isoformat(),
+            'accion': 'actualizacion_manual',
+            'cantidad_agregada': cantidad
+        }
+        notificaciones_queue.put(mensaje)
+
+        return jsonify({
+            'success': True,
+            'mensaje': f'Stock agregado exitosamente',
+            'stock_anterior': stock_actual,
+            'cantidad_agregada': cantidad,
+            'stock_actual': nuevo_stock,
+            'cod_producto': cod_producto,
+            'cod_sucursal': cod_sucursal
+        })
+
+    except Exception as e:
+        print(f"Error al agregar stock: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 def generar_codigo_producto():
@@ -503,6 +675,115 @@ def obtener_sucursales():
         print(f"Error obteniendo sucursales: {str(e)}")
         return jsonify([]), 500
 
+@app.route('/api/productos-paginados', methods=['GET'])
+def productos_paginados():
+    try:
+        # Obtener parámetros de paginación
+        pagina = int(request.args.get('pagina', 1))
+        por_pagina = int(request.args.get('por_pagina', 10))
+        
+        # Validar parámetros
+        if pagina < 1:
+            pagina = 1
+        if por_pagina < 1 or por_pagina > 100:
+            por_pagina = 10
+        
+        # Calcular offset
+        offset = (pagina - 1) * por_pagina
+        
+        # Obtener total de productos
+        total_response = supabase.table('productos').select('cod_producto').execute()
+        total_productos = len(total_response.data)
+        
+        # Obtener productos paginados
+        response = supabase.table('productos').select('*').range(offset, offset + por_pagina - 1).execute()
+        
+        # Calcular stock total para cada producto
+        productos_con_stock = []
+        for producto in response.data:
+            # Obtener stock total del producto sumando todas las sucursales
+            stock_response = supabase.table('producto_sucursal').select('unidades').eq('cod_producto', producto['cod_producto']).execute()
+            
+            stock_total = 0
+            if stock_response.data:
+                stock_total = sum(item['unidades'] for item in stock_response.data)
+            
+            # Agregar el stock total al producto
+            producto_con_stock = producto.copy()
+            producto_con_stock['unidades_p'] = stock_total
+            productos_con_stock.append(producto_con_stock)
+        
+        # Calcular información de paginación
+        total_paginas = (total_productos + por_pagina - 1) // por_pagina
+        
+        return jsonify({
+            'productos': productos_con_stock,
+            'paginacion': {
+                'pagina_actual': pagina,
+                'por_pagina': por_pagina,
+                'total_productos': total_productos,
+                'total_paginas': total_paginas,
+                'tiene_siguiente': pagina < total_paginas,
+                'tiene_anterior': pagina > 1
+            }
+        })
+    except Exception as e:
+        print(f"Error en productos_paginados: {str(e)}")
+        return jsonify({'error': 'Error interno del servidor'}), 500
+
+@app.route('/api/eliminar-producto/<cod_producto>', methods=['DELETE'])
+def eliminar_producto(cod_producto):
+    try:
+        # Verificar si el producto existe
+        producto_response = supabase.table('productos').select('cod_producto').eq('cod_producto', cod_producto).execute()
+        
+        if not producto_response.data:
+            return jsonify({'error': 'Producto no encontrado'}), 404
+        
+        # Verificar si hay stock en alguna sucursal
+        stock_response = supabase.table('producto_sucursal').select('unidades').eq('cod_producto', cod_producto).execute()
+        
+        stock_total = 0
+        if stock_response.data:
+            stock_total = sum(item['unidades'] for item in stock_response.data)
+        
+        if stock_total > 0:
+            return jsonify({
+                'error': 'No se puede eliminar el producto porque tiene stock disponible',
+                'stock_disponible': stock_total
+            }), 400
+        
+        # Verificar si el producto está en alguna boleta (historial de ventas)
+        boleta_response = supabase.table('detalle_boleta').select('cod_producto').eq('cod_producto', cod_producto).execute()
+        
+        if boleta_response.data:
+            return jsonify({
+                'error': 'No se puede eliminar el producto porque tiene historial de ventas'
+            }), 400
+        
+        # Eliminar registros de producto_sucursal primero (por restricciones de clave foránea)
+        supabase.table('producto_sucursal').delete().eq('cod_producto', cod_producto).execute()
+        
+        # Eliminar el producto
+        supabase.table('productos').delete().eq('cod_producto', cod_producto).execute()
+        
+        return jsonify({
+            'mensaje': 'Producto eliminado exitosamente',
+            'cod_producto': cod_producto
+        })
+        
+    except Exception as e:
+        print(f"Error en eliminar_producto: {str(e)}")
+        return jsonify({'error': 'Error interno del servidor'}), 500
+
+@app.route('/api/error-forzado')
+def error_forzado():
+    return jsonify({
+        'error': 'Error de prueba 500',
+        'mensaje': 'Este es un error simulado para propósitos de prueba',
+        'codigo': 500
+    }), 500
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)
 

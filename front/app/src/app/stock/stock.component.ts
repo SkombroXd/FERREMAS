@@ -127,11 +127,112 @@ export class StockComponent implements OnInit, OnDestroy {
     }
     this.eventSource = new EventSource('http://localhost:5000/api/notificaciones');
     
+    // Contador para pruebas de rendimiento
+    let mensajeCount = 0;
+    
+    this.eventSource.onopen = () => {
+      console.log('✅ Conexión SSE establecida');
+    };
+    
     this.eventSource.onmessage = (event) => {
       this.ngZone.run(() => {
+        mensajeCount++;
+        if (mensajeCount % 100 === 0) {
+          console.log(`📊 Recibidos ${mensajeCount} mensajes SSE`);
+        }
+        
         console.log('StockComponent: Mensaje SSE recibido:', event.data);
+        
+        try {
         const notificacion = JSON.parse(event.data);
         
+          // Mostrar timestamp si existe
+          if (notificacion.timestamp) {
+            console.log('🕓 Timestamp:', notificacion.timestamp);
+          }
+          
+          // Manejar diferentes tipos de notificación
+          switch (notificacion.tipo) {
+            case 'conexion':
+              console.log('🔗 Conexión SSE confirmada:', notificacion.mensaje);
+              break;
+              
+            case 'stock_bajo':
+              this.procesarNotificacionStockBajo(notificacion);
+              break;
+              
+            case 'stock_actualizado':
+              this.procesarNotificacionStockActualizado(notificacion);
+              break;
+              
+            case 'manual':
+              console.log('📝 Mensaje manual recibido:', notificacion.mensaje);
+              break;
+              
+            case 'orden':
+              console.log(`📋 Mensaje ordenado ${notificacion.secuencia}:`, notificacion.mensaje);
+              break;
+              
+            case 'error_verificacion':
+              console.warn('⚠️ Error en verificación de stock:', notificacion.mensaje);
+              break;
+              
+            default:
+              console.log('📨 Mensaje SSE genérico:', notificacion);
+          }
+          
+          this.cdr.detectChanges();
+        } catch (error) {
+          console.error('❌ Error parseando JSON SSE:', error);
+          console.error('Datos recibidos:', event.data);
+        }
+      });
+    };
+
+    // Escuchar eventos de error personalizados
+    this.eventSource.addEventListener("error", (event: any) => {
+      this.ngZone.run(() => {
+        console.warn("⚠️ Evento SSE de error personalizado:", event.data);
+        try {
+          const errorData = JSON.parse(event.data);
+          this.alertaMensaje = `Error SSE: ${errorData.mensaje}`;
+          this.mostrarAlerta = true;
+          setTimeout(() => {
+            this.mostrarAlerta = false;
+            this.alertaMensaje = '';
+          }, 5000);
+        } catch (e) {
+          console.error('Error parseando evento de error:', e);
+        }
+      });
+    });
+
+    // Escuchar eventos de cierre
+    this.eventSource.addEventListener("close", (event: any) => {
+      this.ngZone.run(() => {
+        console.warn("🔌 Conexión SSE cerrada por el servidor");
+        try {
+          const closeData = JSON.parse(event.data);
+          console.log('Mensaje de cierre:', closeData.mensaje);
+        } catch (e) {
+          console.error('Error parseando evento de cierre:', e);
+        }
+        this.eventSource?.close();
+      });
+    });
+
+    this.eventSource.onerror = (error) => {
+      this.ngZone.run(() => {
+        console.error('StockComponent: Error en la conexión SSE:', error);
+        if (this.eventSource && this.eventSource.readyState === EventSource.CLOSED) {
+          console.log('StockComponent: Reconectando a SSE...');
+          setTimeout(() => this.iniciarEventSource(), 5000);
+        }
+      });
+    };
+  }
+
+  procesarNotificacionStockBajo(notificacion: any) {
         // Actualizar el producto en la lista si existe y es de la sucursal actual
         const productoIndex = this.productos.findIndex(p => p.cod_producto === notificacion.cod_producto);
         if (productoIndex !== -1 && notificacion.cod_sucursal === this.sucursalSeleccionada) {
@@ -148,7 +249,6 @@ export class StockComponent implements OnInit, OnDestroy {
         }
 
         // Actualizar notificaciones globales
-        if (notificacion.tipo === 'stock_bajo') {
           const existe = this.notificaciones.some(n => 
             n.cod_producto === notificacion.cod_producto && 
             n.cod_sucursal === notificacion.cod_sucursal
@@ -165,28 +265,19 @@ export class StockComponent implements OnInit, OnDestroy {
               this.notificaciones[index] = notificacion;
             }
           }
-        } else if (notificacion.tipo === 'stock_actualizado') {
+
+    // Actualizar el contador de alertas por sucursal
+    this.actualizarContadorAlertasPorSucursal();
+  }
+
+  procesarNotificacionStockActualizado(notificacion: any) {
           // Si el stock se actualizó y ya no está bajo, eliminar la notificación
           this.notificaciones = this.notificaciones.filter(n => 
             !(n.cod_producto === notificacion.cod_producto && n.cod_sucursal === notificacion.cod_sucursal)
           );
-        }
 
         // Actualizar el contador de alertas por sucursal
         this.actualizarContadorAlertasPorSucursal();
-        this.cdr.detectChanges();
-      });
-    };
-
-    this.eventSource.onerror = (error) => {
-      this.ngZone.run(() => {
-        console.error('StockComponent: Error en la conexión SSE:', error);
-        if (this.eventSource && this.eventSource.readyState === EventSource.CLOSED) {
-          console.log('StockComponent: Reconectando a SSE...');
-          setTimeout(() => this.iniciarEventSource(), 5000);
-        }
-      });
-    };
   }
 
   actualizarNotificaciones() {
